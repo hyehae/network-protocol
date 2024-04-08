@@ -2,12 +2,12 @@
 #include<stdlib.h>
 #include<unistd.h>
 #include<string.h>
-#include <WinSock2.h>
-//#include<arpa/inet.h>
-//#include<sys/socket.h>
+//#include <WinSock2.h>
+#include<arpa/inet.h>
+#include<sys/socket.h>
 #include<pthread.h>
 
-#pragma comment (lib, "ws2_32.lib")   //-lws2_32
+//#pragma comment (lib, "ws2_32.lib")   //-lws2_32
 
 #define SIZE 5
 #define BUF_SIZE 50
@@ -27,10 +27,12 @@ int main(int argc, char * argv[]) {
     int sd;
     struct sockaddr_in serv_adr;
 
+    /**
     WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
 		error_handling("WSAStartup() error");
     }
+    **/
 
     if (argc!=3){
         printf("Usage %s <IP> <PORT>\n", argv[0]);
@@ -80,7 +82,7 @@ int main(int argc, char * argv[]) {
         }
     }
 
-    WSACleanup();
+    //WSACleanup();
     close(sd);
     return 0;
 }
