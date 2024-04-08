@@ -15,6 +15,7 @@ int clnt_socks[MAX_CLNT];
 const char* win_msg = "당신이 이겼습니다.";
 const char* lose_msg = "당신이 졌습니다.";
 const char* turn_msg = "당신의 차례가 아닙니다.";
+int cur_turn = 0;
 pthread_mutex_t mutex;
 
 void error_handling(char* message);
@@ -54,7 +55,7 @@ int main(int argc, char* argv[]) {
         char clnt_num_msg[BUF_SIZE];
         sprintf(clnt_num_msg, "You are client #%d\n", clnt_cnt);
         write(clnt_sock, clnt_num_msg, strlen(clnt_num_msg));
-        
+
         pthread_create(&t_id, NULL, handle_clnt, (void*)&clnt_sock);
         pthread_detach(t_id);
         printf("Connected client IP: %s\n", inet_ntoa(clnt_adr.sin_addr));
@@ -66,15 +67,14 @@ void *handle_clnt(void* arg) {
     int clnt_sock = *((int*)arg);
     int str_len = 0, i;
     char msg[BUF_SIZE];
-    int cur_turn = 0;
 
     while((str_len = read(clnt_sock, msg, sizeof(msg))) != 0) {
-        send_msg(msg, str_len);//i행 j열
         //만약 자신의 차례가 아니면 client에 알려줌
         if(clnt_sock != clnt_socks[cur_turn]) {
-            send_msg(turn_msg, 40);
+            send_msg(turn_msg, sizeof(turn_msg));
             continue;
         }
+        send_msg(msg, str_len);//i행 j열
         if(msg[str_len-1] == 'E') { //끝났음을 알림
             send_resultmsg(win_msg, sizeof(win_msg), clnt_sock);
 

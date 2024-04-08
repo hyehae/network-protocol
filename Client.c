@@ -81,8 +81,9 @@ void* send_msg(void* arg) {
             printf("입력 형식이 잘못되었습니다.\n");
             continue;
         }
-        sprintf(name_msg, "%s %s", name, msg);  
-        map[r][c] = mymark;
+        sprintf(name_msg, "%s %s", name, msg);
+        //TODO: 내 차례에 올바르게 했을 때만 map을 채움..  
+        // map[r][c] = mymark;
 
         if(made_line(r, c)) {   //내가 이겼음 (선이 먼저 만들어졌음)
             //만약 끝났다면 0 1 E 아니면 0 1 형태로 server에 보고
@@ -117,11 +118,13 @@ void* rcv_msg(void* arg) {
         }
         name_msg[str_len] = 0;
         fputs(name_msg, stdout);
-        //좌표를 받은 것일 때 -> 받은 위치로 빙고를 채움
-        printf("r: %c, c: %c\n", name_msg[str_len - 4], name_msg[str_len - 2]);
+        
+        //빙고를 채움
         int r = name_msg[str_len - 4] - '0';
         int c = name_msg[str_len - 2] - '0';
-        if(map[r][c] == '.') {  //해당 위치가 상대방이 놓을 위치일때만 채움
+        if(!strncmp(name, name_msg, strlen(name))) {  
+            map[r][c] = mymark;
+        } else {
             map[r][c] = yourmark;
         }
         //변한 틱택토판 출력
