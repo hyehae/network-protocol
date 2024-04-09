@@ -8,7 +8,7 @@
 #include <pthread.h>
 
 #define BUF_SIZE 100
-#define MAX_CLNT 2 // Maximum number of clients
+#define MAX_CLNT 256 // Maximum number of clients
 
 int clnt_cnt = 0;
 int clnt_socks[MAX_CLNT];
@@ -51,6 +51,9 @@ int main(int argc, char *argv[]) {
 
         pthread_mutex_lock(&mutex);
         clnt_socks[clnt_cnt++] = clnt_sock;
+        char msg[BUF_SIZE];
+        sprintf(msg, "You are player %d\n", clnt_cnt);
+        write(clnt_sock, msg, strlen(msg));
         pthread_mutex_unlock(&mutex);
 
         pthread_create(&t_id, NULL, handle_clnt, (void*)&clnt_sock);
@@ -63,24 +66,23 @@ int main(int argc, char *argv[]) {
 
 void *handle_clnt(void *arg) {
     int clnt_sock = *((int*)arg);
+    int str_len = 0, i;
     char msg[BUF_SIZE];
-
-    // Notify client about their player ID
-    sprintf(msg, "You are player %d\n", clnt_cnt - 1);
-    write(clnt_sock, msg, strlen(msg));
 
     // Game loop
     while(1) {
         // Only the current player can make a move
-        if ((clnt_cnt >= MAX_CLNT) && (clnt_cnt > 0) && (current_player == (clnt_cnt - 1))) {
-            // TODO: Implement game flow and broadcasting
-            // Receive moves from clients
-            // Broadcast game status updates to clients
-        } else {
+        if (clnt_sock != clnt_socks[current_player]) {
             // Notify other players to wait for their turn
             sprintf(msg, "Waiting for player %d to make a move\n", current_player);
             write(clnt_sock, msg, strlen(msg));
+            continue;
         }
+        
+        while(str_len = read(clnt_sock, msg, sizeof(msg)) != 0) {
+            send_msg(msg, str_len);
+        }
+        // notify whether game is finished or not
     }
 
     close(clnt_sock);
