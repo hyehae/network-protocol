@@ -116,7 +116,7 @@ void* rcv_msg(void* arg) {
             fputs(name_msg, stdout);
             continue;
         }
-
+        
         //서버에서 결과를 부여받음
         if(!strcmp(name_msg, "당신이 졌습니다.\n") || !strcmp(name_msg, "당신이 이겼습니다.\n")) {
             printf("Game End\n");
@@ -132,7 +132,7 @@ void* rcv_msg(void* arg) {
         r = name_msg[str_len - 4] - '0';
         c = name_msg[str_len - 2] - '0';
         
-        printf("r: %d, c: %d\n", r, c);
+        // printf("r: %d, c: %d\n", r, c);
         if(!strncmp(name, name_msg, strlen(name))) {  
             map[r][c] = mymark;
         } else {

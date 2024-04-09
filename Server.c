@@ -66,9 +66,9 @@ int main(int argc, char* argv[]) {
 void *handle_clnt(void* arg) {
     int clnt_sock = *((int*)arg);
     int str_len = 0, i;
-    int winner_sock = -1;   //승자
     char msg[BUF_SIZE];
-
+    int winner_sock = -1;   //승자
+    
     while(winner_sock == -1 && (str_len = read(clnt_sock, msg, sizeof(msg))) != 0) {
         //만약 자신의 차례가 아니면 client에 알려줌
         if(clnt_sock != clnt_socks[cur_turn]) {
@@ -87,6 +87,7 @@ void *handle_clnt(void* arg) {
         else cur_turn = 0;
     }
     //승자가 정해짐
+    sleep(1);
     if(winner_sock != -1) {
         send_msg_to_one(win_msg, BUF_SIZE, winner_sock);
         if(clnt_socks[0] == clnt_sock) {
