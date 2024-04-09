@@ -175,7 +175,7 @@ int made_line(int r, int c) {
             return 1;
         }
     }
-    map[r][c] = 0;
+    map[r][c] = '.';
     return 0;
 }
 void print_map() {
