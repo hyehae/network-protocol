@@ -12,16 +12,16 @@
 
 int clnt_cnt = 0;
 int clnt_socks[MAX_CLNT];
-const char* win_msg = "당신이 이겼습니다.";
-const char* lose_msg = "당신이 졌습니다.";
-const char* turn_msg = "당신의 차례가 아닙니다.";
+const char* win_msg = "당신이 이겼습니다.\n";
+const char* lose_msg = "당신이 졌습니다.\n";
+const char* turn_msg = "당신의 차례가 아닙니다.\n";
 int cur_turn = 0;
 pthread_mutex_t mutex;
 
 void error_handling(char* message);
 void *handle_clnt(void* arg);
 void send_msg(char* msg, int len);
-void send_resultmsg(char* msg, int len, int sock_num);
+void send_msg_to_one(char* msg, int len, int sock_num);
 int main(int argc, char* argv[]) {
     int serv_sock, clnt_sock;
     struct sockaddr_in serv_adr, clnt_adr;
@@ -66,29 +66,36 @@ int main(int argc, char* argv[]) {
 void *handle_clnt(void* arg) {
     int clnt_sock = *((int*)arg);
     int str_len = 0, i;
+    int winner_sock = -1;   //승자
     char msg[BUF_SIZE];
 
-    while((str_len = read(clnt_sock, msg, sizeof(msg))) != 0) {
+    while(winner_sock == -1 && (str_len = read(clnt_sock, msg, sizeof(msg))) != 0) {
         //만약 자신의 차례가 아니면 client에 알려줌
         if(clnt_sock != clnt_socks[cur_turn]) {
-            send_msg(turn_msg, sizeof(turn_msg));
+            send_msg_to_one(turn_msg, BUF_SIZE, clnt_sock);
             continue;
         }
-        send_msg(msg, str_len);//i행 j열
-        if(msg[str_len-1] == 'E') { //끝났음을 알림
-            send_resultmsg(win_msg, sizeof(win_msg), clnt_sock);
-
-            if(clnt_socks[0] == clnt_sock) {
-                send_resultmsg(lose_msg, sizeof(lose_msg), clnt_socks[1]);
-            } else {
-                send_resultmsg(lose_msg, sizeof(lose_msg), clnt_socks[0]);
-            }
-            break;
+        if(msg[str_len-2] == 'E') { //승자가 끝났음을 알림
+            msg[str_len-3] = '\n';  //E표식을 없앰
+            msg[str_len-2] = 0;
+            str_len -= 2;
+            winner_sock = clnt_sock;
         }
+        send_msg(msg, str_len);//i행 j열
         //순서를 넘김
         if(cur_turn == 0) cur_turn = 1;
         else cur_turn = 0;
     }
+    //승자가 정해짐
+    if(winner_sock != -1) {
+        send_msg_to_one(win_msg, BUF_SIZE, winner_sock);
+        if(clnt_socks[0] == clnt_sock) {
+            send_msg_to_one(lose_msg, BUF_SIZE, clnt_socks[1]);
+        } else {
+            send_msg_to_one(lose_msg, BUF_SIZE, clnt_socks[0]);
+        }
+    }
+
     pthread_mutex_lock(&mutex); //client 중간에 이탈할 수 있음!
     for(i = 0; i < clnt_cnt; i++) {
         if(clnt_sock == clnt_socks[i]) {
@@ -103,6 +110,7 @@ void *handle_clnt(void* arg) {
     close(clnt_sock);
     return NULL;
 }
+//client 1, 2에게 메시지를 다 보냄
 void send_msg(char* msg, int len) {
     int i;
     pthread_mutex_lock(&mutex);
@@ -116,7 +124,8 @@ void error_handling(char* message) {
     fputc('\n', stderr);
     exit(1);
 }
-void send_resultmsg(char* msg, int len, int sock_num) {
+//특정 client에게 메시지를 보냄
+void send_msg_to_one(char* msg, int len, int sock_num) {
     pthread_mutex_lock(&mutex);
     write(sock_num, msg, len);
     pthread_mutex_unlock(&mutex);

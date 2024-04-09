@@ -81,14 +81,19 @@ void* send_msg(void* arg) {
             printf("입력 형식이 잘못되었습니다.\n");
             continue;
         }
+        if(r < 0 || r >= 5 || c < 0 || c >= 5 || map[r][c] != '.') {
+            printf("틱택토 판을 벗어났거나 이미 표시된 위치입니다.\n");
+            continue;
+        }
         sprintf(name_msg, "%s %s", name, msg);
-        //TODO: 내 차례에 올바르게 했을 때만 map을 채움..  
         // map[r][c] = mymark;
 
         if(made_line(r, c)) {   //내가 이겼음 (선이 먼저 만들어졌음)
-            //만약 끝났다면 0 1 E 아니면 0 1 형태로 server에 보고
+            //만약 끝났다면 0 1 E\n 로 서버에 보고
             int len = strlen(name_msg);
-            name_msg[len + 1] = 'E';
+            name_msg[len - 1] = ' ';
+            name_msg[len] = 'E';
+            name_msg[len + 1] = '\n';
         }
         write(sock, name_msg, strlen(name_msg));    //server에 write
     }
@@ -104,24 +109,30 @@ void* rcv_msg(void* arg) {
         if(str_len == -1) {
             return (void*) -1;  //read 끝남
         }
+
+        name_msg[str_len] = 0;
         //서버에서 에러메시지를 받은 것임
-        if(!strcmp(name_msg, "당신의 차례가 아닙니다.")) {
+        if(!strcmp(name_msg, "당신의 차례가 아닙니다.\n")) {
             fputs(name_msg, stdout);
             continue;
         }
 
         //서버에서 결과를 부여받음
-        if(!strcmp(name_msg, "당신이 졌습니다.") || !strcmp(name_msg, "당신이 이겼습니다.")) {
+        if(!strcmp(name_msg, "당신이 졌습니다.\n") || !strcmp(name_msg, "당신이 이겼습니다.\n")) {
+            printf("Game End\n");
             fputs(name_msg, stdout);
             close(sock);
             exit(0);
         }
-        name_msg[str_len] = 0;
         fputs(name_msg, stdout);
         
         //빙고를 채움
-        int r = name_msg[str_len - 4] - '0';
-        int c = name_msg[str_len - 2] - '0';
+        int r = 0, c = 0;
+        
+        r = name_msg[str_len - 4] - '0';
+        c = name_msg[str_len - 2] - '0';
+        
+        printf("r: %d, c: %d\n", r, c);
         if(!strncmp(name, name_msg, strlen(name))) {  
             map[r][c] = mymark;
         } else {
@@ -137,17 +148,34 @@ void error_handling(char* message) {
     fputc('\n', stderr);
     exit(1);
 }
+//param r, c만 추가되면 made_line인지 판별
+//아직 map에 표시한 상태는 아님!
 int made_line(int r, int c) {
+    //일단 판정 편하게 표시 후 지움
+    map[r][c] = mymark;
     //가로선, 세로선
-    if(map[0][c] == mymark && map[1][c] == mymark && map[2][c] == mymark && map[3][c] == mymark && map[4][c] == mymark) return 1;
-    if(map[r][0] == mymark && map[r][1] == mymark && map[r][2] == mymark && map[r][3] == mymark && map[r][4] == mymark) return 1;
+    if(map[0][c] == mymark && map[1][c] == mymark && map[2][c] == mymark && map[3][c] == mymark && map[4][c] == mymark) {
+        map[r][c] = '.';
+        return 1;
+    }
+    if(map[r][0] == mymark && map[r][1] == mymark && map[r][2] == mymark && map[r][3] == mymark && map[r][4] == mymark) {
+        map[r][c] = '.';
+        return 1;
+    }
     //대각선
     if(r == c){
-        if(map[0][0] == mymark && map[1][1] == mymark && map[2][2] == mymark && map[3][3] == mymark && map[4][4] == mymark) return 1;
+        if(map[0][0] == mymark && map[1][1] == mymark && map[2][2] == mymark && map[3][3] == mymark && map[4][4] == mymark) {
+            map[r][c] = '.';
+            return 1;
+        }
     }
     if(r + c == 4) {
-        if(map[0][4] == mymark && map[1][3] == mymark && map[2][2] == mymark && map[3][1] == mymark && map[4][0] == mymark) return 1;
+        if(map[0][4] == mymark && map[1][3] == mymark && map[2][2] == mymark && map[3][1] == mymark && map[4][0] == mymark) {
+            map[r][c] = '.';
+            return 1;
+        }
     }
+    map[r][c] = 0;
     return 0;
 }
 void print_map() {
