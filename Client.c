@@ -2,179 +2,187 @@
 #include<stdlib.h>
 #include<unistd.h>
 #include<string.h>
-//#include <WinSock2.h>
 #include<arpa/inet.h>
-#include<sys/socket.h>
 #include<pthread.h>
 
-//#pragma comment (lib, "ws2_32.lib")   //-lws2_32
-
-#define SIZE 5
 #define BUF_SIZE 100
-pthread_mutex_t mutex;
-char board[SIZE][SIZE];
+#define NAME_SIZE 20
 
-const char* win_msg = "당신이 이겼습니다.";
-const char* lose_msg = "당신이 졌습니다.";
-const char* turn_msg = "당신의 차례가 아닙니다.";
+char name[NAME_SIZE] = "[DEFAULT]";
+char msg[BUF_SIZE];
+char map[5][5];
+char mymark = ' ';
+char yourmark = ' ';
+void error_handling(char* message);
+void* send_msg(void* arg);
+void* rcv_msg(void* arg);
+void print_map();
+int made_line(int r, int c);
 
-void error_handling(char *message);
-void display_board();
-int is_valid_input(int row, int col);
-int check_win();
-void * send_msg(void* arg);
-void * recv_msg(void* arg);
+int main(int argc, char* argv[]) {
+    int sock;
+    struct sockaddr_in serv_addr;
+    pthread_t snd_thread, rcv_thread;
 
-
-int main(int argc, char * argv[]) {
-    char msg[BUF_SIZE];
-    char input[BUF_SIZE];
-    char * win_msg = "Win1";
-    int x, y;
-    int sd;
-    struct sockaddr_in serv_adr;
-    pthread_t snd_thread, rcv_thread;  //보내는 거, 받는 거
-
-    void * thread_return;
-
-    /**
-    WSADATA wsaData;
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-		error_handling("WSAStartup() error");
-    }
-    **/
-
-    if (argc!=3){
-        printf("Usage %s <IP> <PORT>\n", argv[0]);
+    void* thread_return;
+    if(argc != 4) {
+        printf("Usage: %s <IP> <PORT> <NAME>\n", argv[0]);
         exit(1);
     }
+    sprintf(name, "[%s]", argv[3]);
 
-    if ((sd=socket(PF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("fail_socket\n");
-        exit(EXIT_FAILURE);
+    sock = socket(PF_INET, SOCK_STREAM, 0);
+    memset(&serv_addr, 0, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
+    serv_addr.sin_port = htons(atoi(argv[2]));
+
+    if(connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1) {
+        error_handling("connect() error!");
     }
-
-    memset(&serv_adr, 0, sizeof(serv_adr));
-    serv_adr.sin_family=AF_INET;
-    serv_adr.sin_addr.s_addr=inet_addr(argv[1]);
-    serv_adr.sin_port=htons(atoi(argv[2]));
-
-    if (connect(sd, (struct sockaddr*)&serv_adr, sizeof(serv_adr)) == -1) {
-        error_handling("connect() error");
+    //내 순서를 서버에서 부여받음
+    int turn = 0;
+    // 서버로부터 클라이언트 번호 받기
+    char clnt_num_msg[BUF_SIZE];
+    read(sock, clnt_num_msg, BUF_SIZE);
+    printf("%s", clnt_num_msg); // 클라이언트 번호 출력
+    sscanf(clnt_num_msg, "You are client #%d\n", &turn); // 클라이언트 번호 저장
+    //mark 부여
+    if(turn == 1) {
+        mymark = 'o';
+        yourmark = 'x';
+    } else {
+        mymark = 'x';
+        yourmark = 'o';
     }
-
-    memset(board, ' ', sizeof(board));
-    // Game loop
-    pthread_create(&snd_thread, NULL, send_msg, (void*)&sd);
-    pthread_create(&rcv_thread, NULL, recv_msg, (void*)&sd);
+    
+    //빙고판 초기화
+    for(int i=0;i<5;i++) {
+        for(int j=0;j<5;j++) {
+            map[i][j] = '.';
+        }
+    }
+    pthread_create(&snd_thread, NULL, send_msg, (void*)&sock);
+    pthread_create(&rcv_thread, NULL, rcv_msg, (void*)&sock);
     pthread_join(snd_thread, &thread_return);
     pthread_join(rcv_thread, &thread_return);
-
-    //WSACleanup();
-    close(sd);
-    return 0;
+    close(sock);
 }
-
-void * send_msg(void* arg) {  //내 차례 (-> 입력받은 좌표 서버에게 보냄)
-    int sd =*((int*)arg);
-    char input[BUF_SIZE];
-    int x, y;
+void* send_msg(void* arg) {
+    int sock = *((int*)arg);
+    char name_msg[NAME_SIZE + BUF_SIZE];
 
     while(1) {
-        printf("Enter row and col: ");
-        scanf("%d %d", &x, &y);
-
-        pthread_mutex_lock(&mutex);
-        if (!is_valid_input(x, y)) {
-            board[x][y] = 'O';
-            if (check_win()) {
-                write(sd, win_msg, strlen(win_msg));  //이긴 경우, win_msg 보내기
-                break;
-            } else {
-                sprintf(input, "%d %d", x, y); //입력을 서버에 보내기
-                write(sd, input, strlen(input));
-            }
+        printf("표시할 행, 열을 입력하시오(0~4) ex)0 4\n");
+        fgets(msg, BUF_SIZE, stdin);    //msg : 0 1
+        //입력형식 잘못됨
+        int r = 0, c = 0;
+        if(sscanf(msg, "%d %d\n", &r, &c) != 2) {
+            printf("입력 형식이 잘못되었습니다.\n");
+            continue;
         }
-        pthread_mutex_unlock(&mutex);
+        if(r < 0 || r >= 5 || c < 0 || c >= 5 || map[r][c] != '.') {
+            printf("틱택토 판을 벗어났거나 이미 표시된 위치입니다.\n");
+            continue;
+        }
+        sprintf(name_msg, "%s %s", name, msg);
+        // map[r][c] = mymark;
+
+        if(made_line(r, c)) {   //내가 이겼음 (선이 먼저 만들어졌음)
+            //만약 끝났다면 0 1 E\n 로 서버에 보고
+            int len = strlen(name_msg);
+            name_msg[len - 1] = ' ';
+            name_msg[len] = 'E';
+            name_msg[len + 1] = '\n';
+        }
+        write(sock, name_msg, strlen(name_msg));    //server에 write
     }
     return NULL;
 }
+void* rcv_msg(void* arg) {
+    int sock = *((int*)arg);
+    char name_msg[NAME_SIZE + BUF_SIZE];
 
-void * recv_msg(void* arg) {
-    int sd =*((int*)arg);
-    char msg[BUF_SIZE];
-    int x, y;
-
-    while(1) {  //상대방 차례 입력 (-> 서버에서 보냄), 
-        if (read(sd, msg, BUF_SIZE) != 0) {
-            pthread_mutex_lock(&mutex);
-            sscanf(msg, "%d %d", &x, &y);
-            if(!is_valid_input(x, y)) {
-                board[x][y] = 'X';
-            }
-            //입력할 때, check_win하므로 받는 부분에서는 생략
+    int str_len;
+    while(1) {
+        str_len = read(sock, name_msg, NAME_SIZE + BUF_SIZE - 1);
+        if(str_len == -1) {
+            return (void*) -1;  //read 끝남
         }
-    }
-}
-    
 
-void display_board() {
-    printf("\n");
-    for (int i = 0; i < SIZE; i++) {
-        for (int j = 0; j < SIZE; j++) {
-            printf(" %c ", board[i][j]);
-            if (j != SIZE - 1) printf("|");
+        name_msg[str_len] = 0;
+        //서버에서 에러메시지를 받은 것임
+        if(!strcmp(name_msg, "당신의 차례가 아닙니다.\n")) {
+            fputs(name_msg, stdout);
+            continue;
         }
         
-        printf("\n");
-        if (i != SIZE - 1) {
-            for (int k = 0; k < SIZE; k++) {
-                printf("--");
-                if (k != SIZE - 1) printf("|");
-            }
-            printf("\n");
+        //서버에서 결과를 부여받음
+        if(!strcmp(name_msg, "당신이 졌습니다.\n") || !strcmp(name_msg, "당신이 이겼습니다.\n")) {
+            printf("Game End\n");
+            fputs(name_msg, stdout);
+            close(sock);
+            exit(0);
         }
-    }
-    printf("\n");
-}
-
-int is_valid_input(int row, int col) {
-    if (row < 0 && row >= 5 && col < 0 && col >= 5) {
-        printf("out of range\n");
-        return 1;
-    }
-
-    else if (board[row][col] == 'O' || board[row][col] == 'X') {
-        printf("already checked!\n");
-        return 1;
-    }
-
-    else return 0;
-}
-
-int check_win() {
-    int row, col;
-    int diag1 = 0, diag2 = 0;
-
-    for (row = 0; row < SIZE; row++) {
-        int row_count = 0, col_count = 0;
-        for (col = 0; col < SIZE; col++) {
-            if (board[row][col] == 'O') row_count++;
-            if (board[col][row] == 'O') col_count++;
+        fputs(name_msg, stdout);
+        
+        //빙고를 채움
+        int r = 0, c = 0;
+        
+        r = name_msg[str_len - 4] - '0';
+        c = name_msg[str_len - 2] - '0';
+        
+        // printf("r: %d, c: %d\n", r, c);
+        if(!strncmp(name, name_msg, strlen(name))) {  
+            map[r][c] = mymark;
+        } else {
+            map[r][c] = yourmark;
         }
-        if (row_count == SIZE || col_count == SIZE) return 1;
-        if (board[row][row] == 'O') diag1++;
-        if (board[row][SIZE - 1 - row] == 'O') diag2++;
+        //변한 틱택토판 출력
+        print_map();
     }
-    if (diag1 == SIZE || diag2 == SIZE) return 1;
-
-    return 0;
-
+    return NULL;
 }
-
-
-void error_handling(char *message){
+void error_handling(char* message) {
     fputs(message, stderr);
     fputc('\n', stderr);
     exit(1);
+}
+//param r, c만 추가되면 made_line인지 판별
+//아직 map에 표시한 상태는 아님!
+int made_line(int r, int c) {
+    //일단 판정 편하게 표시 후 지움
+    map[r][c] = mymark;
+    //가로선, 세로선
+    if(map[0][c] == mymark && map[1][c] == mymark && map[2][c] == mymark && map[3][c] == mymark && map[4][c] == mymark) {
+        map[r][c] = '.';
+        return 1;
+    }
+    if(map[r][0] == mymark && map[r][1] == mymark && map[r][2] == mymark && map[r][3] == mymark && map[r][4] == mymark) {
+        map[r][c] = '.';
+        return 1;
+    }
+    //대각선
+    if(r == c){
+        if(map[0][0] == mymark && map[1][1] == mymark && map[2][2] == mymark && map[3][3] == mymark && map[4][4] == mymark) {
+            map[r][c] = '.';
+            return 1;
+        }
+    }
+    if(r + c == 4) {
+        if(map[0][4] == mymark && map[1][3] == mymark && map[2][2] == mymark && map[3][1] == mymark && map[4][0] == mymark) {
+            map[r][c] = '.';
+            return 1;
+        }
+    }
+    map[r][c] = '.';
+    return 0;
+}
+void print_map() {
+    for(int i=0;i<5;i++) {
+        for(int j=0;j<5;j++) {
+            printf("%c ", map[i][j]);
+        }
+        printf("\n");
+    }
 }
