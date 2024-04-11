@@ -116,13 +116,13 @@ void* rcv_msg(void* arg) {
 
         name_msg[str_len] = 0;
         //서버에서 에러메시지를 받은 것임
-        if(!strcmp(name_msg, "당신의 차례가 아닙니다.\n")) {
+        if(!strcmp(name_msg, "당신의 차례가 아닙니다\n")) {
             fputs(name_msg, stdout);
             continue;
         }
         
         //서버에서 결과를 부여받음
-        if(!strcmp(name_msg, "당신이 졌습니다.\n") || !strcmp(name_msg, "당신이 이겼습니다.\n")) {
+        if(!strcmp(name_msg, "당신은 졌습니다\n") || !strcmp(name_msg, "당신이 이겼습니다\n")) {
             printf("Game End\n");
             fputs(name_msg, stdout);
             close(sock);

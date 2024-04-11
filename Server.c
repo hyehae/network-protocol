@@ -12,9 +12,9 @@
 
 int clnt_cnt = 0;
 int clnt_socks[MAX_CLNT];
-const char* win_msg = "당신이 이겼습니다.\n";
-const char* lose_msg = "당신이 졌습니다.\n";
-const char* turn_msg = "당신의 차례가 아닙니다.\n";
+const char* win_msg = "당신이 이겼습니다\n";
+const char* lose_msg = "당신은 졌습니다\n";
+const char* turn_msg = "당신의 차례가 아닙니다\n";
 int cur_turn = 0;
 pthread_mutex_t mutex;
 
