@@ -76,8 +76,8 @@ void* send_msg(void* arg) {
     int sock = *((int*)arg);
     char name_msg[NAME_SIZE + BUF_SIZE];
 
+    printf("표시할 행, 열을 입력하시오(0~4) ex)0 4\n");
     while(1) {
-        printf("표시할 행, 열을 입력하시오(0~4) ex)0 4\n");
         fgets(msg, BUF_SIZE, stdin);    //msg : 0 1
         //입력형식 잘못됨
         int r = 0, c = 0;

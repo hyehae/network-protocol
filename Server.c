@@ -107,6 +107,7 @@ void *handle_clnt(void* arg) {
         }
     }
     clnt_cnt--;
+    if (clnt_cnt == 0) cur_turn=0;
     pthread_mutex_unlock(&mutex);
     close(clnt_sock);
     return NULL;
