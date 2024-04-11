@@ -51,9 +51,13 @@ int main(int argc, char* argv[]) {
     if(turn == 1) {
         mymark = 'o';
         yourmark = 'x';
-    } else {
+    } else if (turn == 2) {
         mymark = 'x';
         yourmark = 'o';
+    } else {
+        printf("Already 2 players are playing game\n");
+        close(sock);
+        exit(0);
     }
     
     //빙고판 초기화
